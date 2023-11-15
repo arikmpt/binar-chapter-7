@@ -1,5 +1,6 @@
 const { users } = require('./model');
 const utils = require('./utils');
+const nodemailer = require('nodemailer');
 
 module.exports = {
     register: async (req, res) => {
@@ -34,16 +35,44 @@ module.exports = {
                 return res.render('error');
             }
 
+            const encrypt = await utils.cryptPassword(req.body.email);
+
             await users.update({
                 data: {
-                    resetPasswordToken: await utils.cryptPassword(req.body.email),
+                    resetPasswordToken: encrypt,
                 },
                 where: {
                     id: findUser.id
                 }
             });
 
-            return res.render('success');
+            const transporter = nodemailer.createTransport({
+                host: "smtp.gmail.com",
+                port: 465,
+                secure: false,
+                auth: {
+                    user: process.env.EMAIL_USER,
+                    pass: process.env.EMAIL_PASSWORD
+                }
+            });
+
+            const mailOptions = {
+                from: 'system@gmail.com',
+                to : req.body.email,
+                subject: "Reset Password",
+                html: `<p>Reset Password <a href="localhost:3000/set-password/${encrypt}">Click Here</a></p>`
+            }
+
+            transporter.sendMail(mailOptions, (err) => {
+                if(err) {
+                    console.log(err)
+                    return res.render('error');
+                }
+
+                return res.render('success');
+            })
+ 
+            
             
         } catch (error) {
             console.log(error)
